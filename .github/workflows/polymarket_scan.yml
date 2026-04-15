@@ -1,0 +1,36 @@
+name: Polymarket Daily Scanner
+
+on:
+  schedule:
+    # Every day at 00:05 UTC (after midnight rollover)
+    - cron: "5 0 * * *"
+  workflow_dispatch:  # Allow manual runs from GitHub UI
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed to push the DB back to the repo
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run scanner
+        env:
+          DB_PATH: polymarket.db
+          TOP_N: "20"
+        run: python polymarket_scanner.py
+
+      - name: Commit and push DB
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add polymarket.db
+          git diff --cached --quiet || git commit -m "chore: daily Polymarket scan $(date -u +%Y-%m-%d)"
+          git push
