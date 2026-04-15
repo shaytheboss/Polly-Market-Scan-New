@@ -1,8 +1,11 @@
 import urllib.request, json
 
-slug = "will-the-fed-decrease-interest-rates-by-50-bps-after-the-april-2"  # קח slug אמיתי מהתוצאות
-url = f"https://gamma-api.polymarket.com/markets/{slug}/history?interval=1d&fidelity=60"
+# קודם נביא שוק אמיתי ונראה מה המבנה שלו
+url = "https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=1"
 req = urllib.request.Request(url, headers={"User-Agent": "test"})
 with urllib.request.urlopen(req) as r:
-    print(r.status)
-    print(json.loads(r.read())[:3])
+    data = json.loads(r.read())
+    market = data[0]
+    print("=== כל השדות של שוק ===")
+    for key, val in market.items():
+        print(f"  {key}: {val}")
