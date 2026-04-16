@@ -28,6 +28,8 @@ jobs:
           TOP_N_WINNERS: "100"
           MIN_TRADE_USDC: "5"
           MIN_PROFIT_USDC: "2"
+          MIN_MARKET_VOLUME: "500"
+          MAX_MARKETS_FOR_WINNERS: "30"
           RESOLVED_LOOKBACK_DAYS: "3"
         run: python polymarket_scanner.py
 
