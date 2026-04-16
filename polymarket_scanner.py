@@ -1,10 +1,8 @@
 """
-Polymarket Weather Scanner v4
+Polymarket Weather Scanner v5
 ==============================
-FAST: fetches all recent trades in bulk, filters locally.
-No more 535 individual API calls — just a few bulk requests.
-
-Saves raw winner data to DB for the insights script to analyze.
+FAST: only fetches winner trades for the top N markets by volume.
+Skips tiny markets entirely — the interesting traders are in big markets.
 """
 
 import sqlite3
@@ -28,6 +26,8 @@ TOP_N_MOVERS           = int(os.getenv("TOP_N_MOVERS", "50"))
 TOP_N_WINNERS          = int(os.getenv("TOP_N_WINNERS", "100"))
 MIN_TRADE_USDC         = float(os.getenv("MIN_TRADE_USDC", "5"))
 MIN_PROFIT_USDC        = float(os.getenv("MIN_PROFIT_USDC", "2"))
+MIN_MARKET_VOLUME      = float(os.getenv("MIN_MARKET_VOLUME", "500"))   # skip markets below this
+MAX_MARKETS_FOR_WINNERS = int(os.getenv("MAX_MARKETS_FOR_WINNERS", "30")) # hard cap
 RESOLVED_LOOKBACK_DAYS = int(os.getenv("RESOLVED_LOOKBACK_DAYS", "3"))
 
 # ─── Weather filter ───────────────────────────────────────────────────────────
@@ -101,7 +101,6 @@ def init_db(conn: sqlite3.Connection):
             price_change_7d REAL, volume_24h REAL, end_date TEXT, url TEXT
         );
 
-        -- One row per winner per resolved market
         CREATE TABLE IF NOT EXISTS winners (
             id                     INTEGER PRIMARY KEY AUTOINCREMENT,
             scan_id                INTEGER REFERENCES daily_scans(id),
@@ -113,8 +112,8 @@ def init_db(conn: sqlite3.Connection):
             condition_id           TEXT,
             market_slug            TEXT,
             market_url             TEXT,
-            trade_timestamp        TEXT,   -- earliest BUY on the winning side
-            entry_price            REAL,   -- price at earliest trade
+            trade_timestamp        TEXT,
+            entry_price            REAL,
             usdc_spent             REAL,
             tokens_bought          REAL,
             profit_usdc            REAL,
@@ -122,10 +121,10 @@ def init_db(conn: sqlite3.Connection):
             polymarket_profile_url TEXT
         );
 
-        CREATE INDEX IF NOT EXISTS idx_scan_date    ON daily_scans(scan_date);
+        CREATE INDEX IF NOT EXISTS idx_scan_date     ON daily_scans(scan_date);
         CREATE INDEX IF NOT EXISTS idx_winner_wallet ON winners(proxy_wallet);
-        CREATE INDEX IF NOT EXISTS idx_winner_scan  ON winners(scan_id);
-        CREATE INDEX IF NOT EXISTS idx_winner_date  ON winners(scan_date);
+        CREATE INDEX IF NOT EXISTS idx_winner_scan   ON winners(scan_id);
+        CREATE INDEX IF NOT EXISTS idx_winner_date   ON winners(scan_date);
     """)
     conn.commit()
 
@@ -134,7 +133,7 @@ def init_db(conn: sqlite3.Connection):
 def fetch_json(url: str, timeout: int = 45, retries: int = 3) -> list | dict:
     for attempt in range(retries):
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "polymarket-weather/4.0"})
+            req = urllib.request.Request(url, headers={"User-Agent": "polymarket-weather/5.0"})
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 return json.loads(resp.read().decode())
         except urllib.error.HTTPError as e:
@@ -228,63 +227,48 @@ def parse_market(m: dict) -> Optional[dict]:
         print(f"  Parse error {m.get('id','?')}: {e}", file=sys.stderr)
         return None
 
-# ─── FAST bulk trade fetching ─────────────────────────────────────────────────
+# ─── Winners — fast, top markets only ────────────────────────────────────────
 
-def fetch_winners_bulk(resolved_markets: list[dict], top_n: int) -> list[dict]:
-    """
-    Fast approach: build a set of winning (conditionId, outcomeIndex) pairs,
-    then fetch trades per conditionId only for markets that had trades
-    (using the conditionIds list endpoint which batches multiple markets).
-    
-    Still per-market but with no sleep and early exit when trades=0.
-    Key optimization: sort by volume descending so high-activity markets
-    come first — we're likely to hit TOP_N winners quickly and can stop early.
-    """
-    # Build lookup: conditionId -> (question, slug, winning_index)
-    market_lookup: dict[str, dict] = {}
-    for m in resolved_markets:
-        cid = m.get("conditionId") or ""
-        if cid:
-            market_lookup[cid] = {
-                "question":     m.get("question") or "",
-                "slug":         m.get("slug") or "",
-                "winning_index": get_winning_outcome_index(m),
-                "volume":        float(m.get("volume") or 0),
-            }
+def fetch_winners(resolved_markets: list[dict], top_n: int) -> list[dict]:
+    # Filter by minimum volume and cap at MAX_MARKETS_FOR_WINNERS
+    candidates = [
+        m for m in resolved_markets
+        if float(m.get("volume") or 0) >= MIN_MARKET_VOLUME
+    ]
+    # Sort by volume descending, take top N
+    candidates = sorted(candidates, key=lambda m: float(m.get("volume") or 0), reverse=True)
+    candidates = candidates[:MAX_MARKETS_FOR_WINNERS]
 
-    # Sort by volume desc — biggest markets first, more likely to have winners
-    sorted_markets = sorted(
-        market_lookup.items(),
-        key=lambda x: x[1]["volume"],
-        reverse=True
-    )
-
-    print(f"\nFetching winners from {len(sorted_markets)} resolved weather markets (bulk mode)...")
+    skipped = len(resolved_markets) - len(candidates)
+    print(f"\nFetching winners: {len(candidates)} markets")
+    print(f"  (skipped {skipped} with volume < ${MIN_MARKET_VOLUME:,.0f} or beyond top {MAX_MARKETS_FOR_WINNERS})")
 
     all_winners: list[dict] = []
 
-    for i, (cid, info) in enumerate(sorted_markets):
-        winning_index = info["winning_index"]
-        question      = info["question"]
-        slug          = info["slug"]
+    for i, m in enumerate(candidates):
+        cid           = m.get("conditionId") or ""
+        question      = m.get("question") or ""
+        slug          = m.get("slug") or ""
         market_url    = f"https://polymarket.com/event/{slug}" if slug else ""
+        winning_index = get_winning_outcome_index(m)
         winning_side  = "YES" if winning_index == 0 else "NO"
+        vol           = float(m.get("volume") or 0)
 
-        if winning_index is None:
+        if not cid or winning_index is None:
             continue
 
-        # Fetch trades for winning side — limit to 1 page first to check if any exist
-        url = f"{DATA_API}/trades?conditionId={cid}&side=BUY&outcomeIndex={winning_index}&limit=500"
+        print(f"  [{i+1}/{len(candidates)}] [{winning_side}✓] ${vol:,.0f}  {question[:55]}...")
+
         try:
-            trades = fetch_json(url)
+            trades = fetch_json(
+                f"{DATA_API}/trades?conditionId={cid}&side=BUY&outcomeIndex={winning_index}&limit=500"
+            )
         except Exception as e:
-            print(f"  [{i+1}/{len(sorted_markets)}] Error: {e}", file=sys.stderr)
+            print(f"    Error: {e}", file=sys.stderr)
             continue
 
         if not trades:
-            continue  # no trades at all — skip silently, no sleep needed
-
-        print(f"  [{i+1}/{len(sorted_markets)}] [{winning_side}✓] {question[:60]}  ({len(trades)} trades)")
+            continue
 
         # Aggregate per wallet
         wallet_data: dict[str, dict] = {}
@@ -433,7 +417,7 @@ def print_report(vol_top, mover_top, winners):
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
-    print(f"[{datetime.now(timezone.utc).isoformat()}] Starting Polymarket weather scanner v4")
+    print(f"[{datetime.now(timezone.utc).isoformat()}] Starting Polymarket weather scanner v5")
     conn = sqlite3.connect(DB_PATH)
     init_db(conn)
 
@@ -445,7 +429,7 @@ def main():
                         key=lambda m: abs(m["price_change_7d"]), reverse=True)[:TOP_N_MOVERS]
 
     resolved_raw = fetch_resolved_weather()
-    winners      = fetch_winners_bulk(resolved_raw, TOP_N_WINNERS)
+    winners      = fetch_winners(resolved_raw, TOP_N_WINNERS)
     print(f"Found {len(winners)} winners")
 
     scan_id = save_scan(conn, active, vol_top, mover_top, winners)
