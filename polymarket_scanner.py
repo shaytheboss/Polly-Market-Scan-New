@@ -261,7 +261,7 @@ def fetch_winners(resolved_markets: list[dict], top_n: int) -> list[dict]:
 
         try:
             trades = fetch_json(
-                f"{DATA_API}/trades?conditionId={cid}&side=BUY&outcomeIndex={winning_index}&limit=500"
+                f"{DATA_API}/trades?market={cid}&side=BUY&outcomeIndex={winning_index}&limit=500"
             )
         except Exception as e:
             print(f"    Error: {e}", file=sys.stderr)
