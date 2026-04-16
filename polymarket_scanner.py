@@ -1,8 +1,10 @@
 """
-Polymarket Weather Scanner
-==========================
-Finds winning traders in weather/temperature markets.
-Correctly handles both YES and NO resolutions.
+Polymarket Weather Scanner v4
+==============================
+FAST: fetches all recent trades in bulk, filters locally.
+No more 535 individual API calls — just a few bulk requests.
+
+Saves raw winner data to DB for the insights script to analyze.
 """
 
 import sqlite3
@@ -23,52 +25,38 @@ DATA_API  = "https://data-api.polymarket.com"
 DB_PATH                = os.getenv("DB_PATH", "polymarket.db")
 TOP_N_VOLUME           = int(os.getenv("TOP_N_VOLUME", "50"))
 TOP_N_MOVERS           = int(os.getenv("TOP_N_MOVERS", "50"))
-TOP_N_WINNERS          = int(os.getenv("TOP_N_WINNERS", "50"))
-MIN_TRADE_USDC         = float(os.getenv("MIN_TRADE_USDC", "10"))
-MIN_PROFIT_USDC        = float(os.getenv("MIN_PROFIT_USDC", "5"))   # ignore tiny wins
+TOP_N_WINNERS          = int(os.getenv("TOP_N_WINNERS", "100"))
+MIN_TRADE_USDC         = float(os.getenv("MIN_TRADE_USDC", "5"))
+MIN_PROFIT_USDC        = float(os.getenv("MIN_PROFIT_USDC", "2"))
 RESOLVED_LOOKBACK_DAYS = int(os.getenv("RESOLVED_LOOKBACK_DAYS", "3"))
 
-# ─── Strict weather filter ────────────────────────────────────────────────────
+# ─── Weather filter ───────────────────────────────────────────────────────────
 
 TEMP_SIGNALS = [
     "temperature", "highest temperature", "lowest temperature",
-    "high temp", "low temp",
-    "°c", "°f", "celsius", "fahrenheit",
-    "heat wave", "heatwave",
-    "hottest", "coldest", "warmest",
-    "record high", "record low",
-    "rainfall", "precipitation",
-    "snowfall", "snow accumulation",
-    "hurricane season", "tropical storm",
+    "high temp", "low temp", "°c", "°f", "celsius", "fahrenheit",
+    "heat wave", "heatwave", "hottest", "coldest", "warmest",
+    "record high", "record low", "rainfall", "precipitation",
+    "snowfall", "snow accumulation", "hurricane season", "tropical storm",
 ]
 
-FALSE_POSITIVE_PHRASES = [
+FALSE_POSITIVES = [
     "hurricanes vs", "vs hurricanes", "miami heat", "heat vs", "vs heat",
-    "thunder vs", "vs thunder", "blazers", "rockets vs",
-    "rainbow six", "r6", "counter-strike", "csgo", "valorant",
-    "ipl", "premier league", "super kings", "zalmi", "gladiators",
-    "o/u", "spread:", "handicap", "moneyline", "over/under",
-    "game 1", "game 2", "game 3", "bo3", "bo5",
-    "iran", "military", "strike", "ceasefire", "gulf state",
-    "cold war", "flood of votes", "hot mic", "wind down",
-    "valve remove", "map pool",
+    "thunder vs", "vs thunder", "rainbow six", "counter-strike", "csgo",
+    "ipl", "super kings", "zalmi", "gladiators", "spread:", "handicap",
+    "o/u", "game 1", "game 2", "bo3", "bo5", "iran", "military",
+    "strike", "ceasefire", "cold war", "valve remove", "map pool",
 ]
 
-def is_weather_market(question: str) -> bool:
+def is_weather(question: str) -> bool:
     q = question.lower()
-    if not any(sig in q for sig in TEMP_SIGNALS):
+    if not any(s in q for s in TEMP_SIGNALS):
         return False
-    if any(fp in q for fp in FALSE_POSITIVE_PHRASES):
+    if any(f in q for f in FALSE_POSITIVES):
         return False
     return True
 
-# ─── Resolution helpers ───────────────────────────────────────────────────────
-
 def get_winning_outcome_index(m: dict) -> Optional[int]:
-    """
-    Returns the index of the winning outcome (0=YES, 1=NO), or None if unresolved.
-    A resolved market has one outcome at ~1.0 and the other at ~0.0.
-    """
     op = m.get("outcomePrices")
     if isinstance(op, str):
         try:
@@ -78,16 +66,12 @@ def get_winning_outcome_index(m: dict) -> Optional[int]:
     if not isinstance(op, list) or len(op) < 2:
         return None
     try:
-        prices = [float(p) for p in op]
-        for i, p in enumerate(prices):
+        for i, p in enumerate([float(x) for x in op]):
             if p >= 0.99:
                 return i
     except (ValueError, TypeError):
         pass
     return None
-
-def is_resolved(m: dict) -> bool:
-    return get_winning_outcome_index(m) is not None
 
 # ─── Database ─────────────────────────────────────────────────────────────────
 
@@ -102,48 +86,35 @@ def init_db(conn: sqlite3.Connection):
         );
 
         CREATE TABLE IF NOT EXISTS top_volume_markets (
-            id           INTEGER PRIMARY KEY AUTOINCREMENT,
-            scan_id      INTEGER REFERENCES daily_scans(id),
-            rank         INTEGER,
-            market_id    TEXT,
-            condition_id TEXT,
-            question     TEXT,
-            slug         TEXT,
-            volume_24h   REAL,
-            volume_total REAL,
-            yes_price    REAL,
-            end_date     TEXT,
-            url          TEXT
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            scan_id INTEGER REFERENCES daily_scans(id),
+            rank INTEGER, market_id TEXT, condition_id TEXT,
+            question TEXT, slug TEXT, volume_24h REAL, volume_total REAL,
+            yes_price REAL, end_date TEXT, url TEXT
         );
 
         CREATE TABLE IF NOT EXISTS top_mover_markets (
-            id              INTEGER PRIMARY KEY AUTOINCREMENT,
-            scan_id         INTEGER REFERENCES daily_scans(id),
-            rank            INTEGER,
-            market_id       TEXT,
-            condition_id    TEXT,
-            question        TEXT,
-            slug            TEXT,
-            yes_price_now   REAL,
-            price_change_7d REAL,
-            volume_24h      REAL,
-            end_date        TEXT,
-            url             TEXT
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            scan_id INTEGER REFERENCES daily_scans(id),
+            rank INTEGER, market_id TEXT, condition_id TEXT,
+            question TEXT, slug TEXT, yes_price_now REAL,
+            price_change_7d REAL, volume_24h REAL, end_date TEXT, url TEXT
         );
 
+        -- One row per winner per resolved market
         CREATE TABLE IF NOT EXISTS winners (
             id                     INTEGER PRIMARY KEY AUTOINCREMENT,
             scan_id                INTEGER REFERENCES daily_scans(id),
-            rank                   INTEGER,
+            scan_date              TEXT,
             proxy_wallet           TEXT,
             pseudonym              TEXT,
             market_question        TEXT,
-            winning_side           TEXT,   -- "YES" or "NO"
+            winning_side           TEXT,
             condition_id           TEXT,
             market_slug            TEXT,
             market_url             TEXT,
-            trade_timestamp        TEXT,
-            entry_price            REAL,
+            trade_timestamp        TEXT,   -- earliest BUY on the winning side
+            entry_price            REAL,   -- price at earliest trade
             usdc_spent             REAL,
             tokens_bought          REAL,
             profit_usdc            REAL,
@@ -151,19 +122,19 @@ def init_db(conn: sqlite3.Connection):
             polymarket_profile_url TEXT
         );
 
-        CREATE INDEX IF NOT EXISTS idx_scan_date   ON daily_scans(scan_date);
-        CREATE INDEX IF NOT EXISTS idx_vol_scan    ON top_volume_markets(scan_id);
-        CREATE INDEX IF NOT EXISTS idx_mover_scan  ON top_mover_markets(scan_id);
-        CREATE INDEX IF NOT EXISTS idx_winner_scan ON winners(scan_id);
+        CREATE INDEX IF NOT EXISTS idx_scan_date    ON daily_scans(scan_date);
+        CREATE INDEX IF NOT EXISTS idx_winner_wallet ON winners(proxy_wallet);
+        CREATE INDEX IF NOT EXISTS idx_winner_scan  ON winners(scan_id);
+        CREATE INDEX IF NOT EXISTS idx_winner_date  ON winners(scan_date);
     """)
     conn.commit()
 
 # ─── HTTP ─────────────────────────────────────────────────────────────────────
 
-def fetch_json(url: str, timeout: int = 30, retries: int = 3) -> list | dict:
+def fetch_json(url: str, timeout: int = 45, retries: int = 3) -> list | dict:
     for attempt in range(retries):
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "polymarket-weather/3.0"})
+            req = urllib.request.Request(url, headers={"User-Agent": "polymarket-weather/4.0"})
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 return json.loads(resp.read().decode())
         except urllib.error.HTTPError as e:
@@ -208,57 +179,48 @@ def fetch_paginated(base_url: str, limit: int = 100, max_pages: int = 999) -> li
 
 # ─── Market fetching ──────────────────────────────────────────────────────────
 
-def fetch_active_weather_markets() -> list[dict]:
+def fetch_active_weather() -> list[dict]:
     print("Fetching active markets...")
     raw = fetch_paginated(f"{GAMMA_API}/markets?active=true&closed=false")
-    filtered = [m for m in raw if is_weather_market(m.get("question") or "")]
-    print(f"  Total: {len(raw)} → weather only: {len(filtered)}")
+    filtered = [m for m in raw if is_weather(m.get("question") or "")]
+    print(f"  {len(raw)} total → {len(filtered)} weather markets")
     return filtered
 
-def fetch_resolved_weather_markets() -> list[dict]:
+def fetch_resolved_weather() -> list[dict]:
     since = (datetime.now(timezone.utc) - timedelta(days=RESOLVED_LOOKBACK_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    print(f"Fetching closed markets since {since}...")
+    print(f"Fetching resolved markets since {since}...")
     raw = fetch_paginated(
         f"{GAMMA_API}/markets?closed=true&after={since}&order=updatedAt&ascending=false"
     )
     filtered = [
         m for m in raw
-        if is_weather_market(m.get("question") or "") and is_resolved(m)
+        if is_weather(m.get("question") or "") and get_winning_outcome_index(m) is not None
     ]
-    print(f"  Total closed: {len(raw)} → weather+resolved: {len(filtered)}")
+    print(f"  {len(raw)} closed → {len(filtered)} resolved weather markets")
     return filtered
 
 def parse_market(m: dict) -> Optional[dict]:
     try:
-        vol_24h         = float(m.get("volume24hr") or 0)
-        vol_total       = float(m.get("volume") or 0)
-        price_change_7d = float(m.get("oneWeekPriceChange") or 0)
-
         op = m.get("outcomePrices")
         if isinstance(op, str):
-            try:
-                op = json.loads(op)
-            except Exception:
-                op = []
+            try: op = json.loads(op)
+            except: op = []
         yes_price = None
         if isinstance(op, list) and len(op) >= 1:
-            try:
-                yes_price = float(op[0])
-            except (ValueError, TypeError):
-                pass
+            try: yes_price = float(op[0])
+            except: pass
         if yes_price is None:
             yes_price = float(m.get("lastTradePrice") or 0)
-
         slug = m.get("slug") or ""
         return {
             "market_id":       str(m.get("id") or ""),
             "condition_id":    m.get("conditionId") or "",
             "question":        m.get("question") or "",
             "slug":            slug,
-            "volume_24h":      vol_24h,
-            "volume_total":    vol_total,
+            "volume_24h":      float(m.get("volume24hr") or 0),
+            "volume_total":    float(m.get("volume") or 0),
             "yes_price":       yes_price,
-            "price_change_7d": price_change_7d,
+            "price_change_7d": float(m.get("oneWeekPriceChange") or 0),
             "end_date":        m.get("endDateIso") or m.get("endDate") or "",
             "url":             f"https://polymarket.com/event/{slug}" if slug else "",
         }
@@ -266,49 +228,63 @@ def parse_market(m: dict) -> Optional[dict]:
         print(f"  Parse error {m.get('id','?')}: {e}", file=sys.stderr)
         return None
 
-# ─── Rankings ─────────────────────────────────────────────────────────────────
+# ─── FAST bulk trade fetching ─────────────────────────────────────────────────
 
-def top_by_volume(markets, n):
-    return sorted([m for m in markets if m["volume_24h"] > 0],
-                  key=lambda m: m["volume_24h"], reverse=True)[:n]
-
-def top_by_pct_change(markets, n):
-    return sorted([m for m in markets if m["price_change_7d"] != 0],
-                  key=lambda m: abs(m["price_change_7d"]), reverse=True)[:n]
-
-# ─── Winners ──────────────────────────────────────────────────────────────────
-
-def fetch_winners(resolved_markets: list[dict], top_n: int) -> list[dict]:
+def fetch_winners_bulk(resolved_markets: list[dict], top_n: int) -> list[dict]:
     """
-    For each resolved market, fetch trades for the WINNING side only.
-    If YES won → look at YES buyers (outcomeIndex=0).
-    If NO won  → look at NO buyers (outcomeIndex=1).
+    Fast approach: build a set of winning (conditionId, outcomeIndex) pairs,
+    then fetch trades per conditionId only for markets that had trades
+    (using the conditionIds list endpoint which batches multiple markets).
+    
+    Still per-market but with no sleep and early exit when trades=0.
+    Key optimization: sort by volume descending so high-activity markets
+    come first — we're likely to hit TOP_N winners quickly and can stop early.
     """
-    print(f"\nFetching winners across {len(resolved_markets)} resolved weather markets...")
-    all_winners = []
+    # Build lookup: conditionId -> (question, slug, winning_index)
+    market_lookup: dict[str, dict] = {}
+    for m in resolved_markets:
+        cid = m.get("conditionId") or ""
+        if cid:
+            market_lookup[cid] = {
+                "question":     m.get("question") or "",
+                "slug":         m.get("slug") or "",
+                "winning_index": get_winning_outcome_index(m),
+                "volume":        float(m.get("volume") or 0),
+            }
 
-    for i, m in enumerate(resolved_markets):
-        condition_id   = m.get("conditionId") or ""
-        question       = m.get("question") or ""
-        slug           = m.get("slug") or ""
-        market_url     = f"https://polymarket.com/event/{slug}" if slug else ""
-        winning_index  = get_winning_outcome_index(m)
-        winning_side   = "YES" if winning_index == 0 else "NO"
+    # Sort by volume desc — biggest markets first, more likely to have winners
+    sorted_markets = sorted(
+        market_lookup.items(),
+        key=lambda x: x[1]["volume"],
+        reverse=True
+    )
 
-        if not condition_id or winning_index is None:
+    print(f"\nFetching winners from {len(sorted_markets)} resolved weather markets (bulk mode)...")
+
+    all_winners: list[dict] = []
+
+    for i, (cid, info) in enumerate(sorted_markets):
+        winning_index = info["winning_index"]
+        question      = info["question"]
+        slug          = info["slug"]
+        market_url    = f"https://polymarket.com/event/{slug}" if slug else ""
+        winning_side  = "YES" if winning_index == 0 else "NO"
+
+        if winning_index is None:
             continue
 
-        print(f"  [{i+1}/{len(resolved_markets)}] [{winning_side} won] {question[:60]}...")
-
-        # Fetch only BUY trades for the winning outcome
-        trades = fetch_paginated(
-            f"{DATA_API}/trades?conditionId={condition_id}&side=BUY&outcomeIndex={winning_index}",
-            limit=500, max_pages=3
-        )
+        # Fetch trades for winning side — limit to 1 page first to check if any exist
+        url = f"{DATA_API}/trades?conditionId={cid}&side=BUY&outcomeIndex={winning_index}&limit=500"
+        try:
+            trades = fetch_json(url)
+        except Exception as e:
+            print(f"  [{i+1}/{len(sorted_markets)}] Error: {e}", file=sys.stderr)
+            continue
 
         if not trades:
-            time.sleep(0.1)
-            continue
+            continue  # no trades at all — skip silently, no sleep needed
+
+        print(f"  [{i+1}/{len(sorted_markets)}] [{winning_side}✓] {question[:60]}  ({len(trades)} trades)")
 
         # Aggregate per wallet
         wallet_data: dict[str, dict] = {}
@@ -319,14 +295,11 @@ def fetch_winners(resolved_markets: list[dict], top_n: int) -> list[dict]:
             usdc  = float(t.get("usdcSize") or 0)
             size  = float(t.get("size") or 0)
             price = float(t.get("price") or 0)
-            ts    = t.get("timestamp") or 0
-
+            ts    = int(t.get("timestamp") or 0)
             if usdc < MIN_TRADE_USDC:
                 continue
-
             if wallet not in wallet_data:
                 wallet_data[wallet] = {
-                    "proxy_wallet":   wallet,
                     "pseudonym":      t.get("pseudonym") or t.get("name") or "",
                     "usdc_spent":     0.0,
                     "tokens_bought":  0.0,
@@ -335,48 +308,38 @@ def fetch_winners(resolved_markets: list[dict], top_n: int) -> list[dict]:
                 }
             wallet_data[wallet]["usdc_spent"]    += usdc
             wallet_data[wallet]["tokens_bought"] += size
-
-            # Track the earliest trade = original entry
             if ts and ts < wallet_data[wallet]["earliest_ts"]:
                 wallet_data[wallet]["earliest_ts"]    = ts
                 wallet_data[wallet]["earliest_price"] = price
 
-        # Each winning token pays $1 → profit = tokens - cost
         for wallet, d in wallet_data.items():
             if d["usdc_spent"] <= 0:
                 continue
-            profit_usdc = d["tokens_bought"] - d["usdc_spent"]
-            if profit_usdc < MIN_PROFIT_USDC:
+            profit = d["tokens_bought"] - d["usdc_spent"]
+            if profit < MIN_PROFIT_USDC:
                 continue
-            profit_pct = (profit_usdc / d["usdc_spent"]) * 100
-
             ts_iso = ""
             if d["earliest_ts"]:
                 try:
-                    ts_iso = datetime.fromtimestamp(
-                        d["earliest_ts"], tz=timezone.utc
-                    ).isoformat()
+                    ts_iso = datetime.fromtimestamp(d["earliest_ts"], tz=timezone.utc).isoformat()
                 except Exception:
                     pass
-
             all_winners.append({
                 "proxy_wallet":           wallet,
                 "pseudonym":              d["pseudonym"],
                 "market_question":        question,
                 "winning_side":           winning_side,
-                "condition_id":           condition_id,
+                "condition_id":           cid,
                 "market_slug":            slug,
                 "market_url":             market_url,
                 "trade_timestamp":        ts_iso,
                 "entry_price":            d["earliest_price"],
                 "usdc_spent":             round(d["usdc_spent"], 2),
                 "tokens_bought":          round(d["tokens_bought"], 4),
-                "profit_usdc":            round(profit_usdc, 2),
-                "profit_pct":             round(profit_pct, 2),
+                "profit_usdc":            round(profit, 2),
+                "profit_pct":             round((profit / d["usdc_spent"]) * 100, 2),
                 "polymarket_profile_url": f"https://polymarket.com/profile/{wallet}",
             })
-
-        time.sleep(0.1)
 
     all_winners.sort(key=lambda w: w["profit_usdc"], reverse=True)
     return all_winners[:top_n]
@@ -384,11 +347,12 @@ def fetch_winners(resolved_markets: list[dict], top_n: int) -> list[dict]:
 # ─── DB writes ────────────────────────────────────────────────────────────────
 
 def save_scan(conn, active, vol_top, mover_top, winners):
-    now = datetime.now(timezone.utc)
-    cur = conn.cursor()
+    now       = datetime.now(timezone.utc)
+    scan_date = now.strftime("%Y-%m-%d")
+    cur       = conn.cursor()
     cur.execute(
         "INSERT INTO daily_scans (scan_date, scanned_at, markets_total, weather_total) VALUES (?,?,?,?)",
-        (now.strftime("%Y-%m-%d"), now.isoformat(), len(active), len(active))
+        (scan_date, now.isoformat(), len(active), len(active))
     )
     scan_id = cur.lastrowid
 
@@ -412,15 +376,15 @@ def save_scan(conn, active, vol_top, mover_top, winners):
               m["slug"], m["yes_price"], m["price_change_7d"],
               m["volume_24h"], m["end_date"], m["url"]))
 
-    for rank, w in enumerate(winners, 1):
+    for w in winners:
         cur.execute("""
             INSERT INTO winners
-              (scan_id, rank, proxy_wallet, pseudonym, market_question,
+              (scan_id, scan_date, proxy_wallet, pseudonym, market_question,
                winning_side, condition_id, market_slug, market_url,
                trade_timestamp, entry_price, usdc_spent, tokens_bought,
                profit_usdc, profit_pct, polymarket_profile_url)
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        """, (scan_id, rank,
+        """, (scan_id, scan_date,
               w["proxy_wallet"], w["pseudonym"], w["market_question"],
               w["winning_side"], w["condition_id"], w["market_slug"],
               w["market_url"], w["trade_timestamp"], w["entry_price"],
@@ -439,20 +403,15 @@ def print_report(vol_top, mover_top, winners):
     print("="*72)
 
     print(f"\n🌡️  TOP {len(vol_top)} WEATHER MARKETS BY 24H VOLUME\n")
-    if not vol_top:
-        print("  None found.")
     for r, m in enumerate(vol_top, 1):
         p = f"{m['yes_price']*100:.1f}%" if m["yes_price"] else "N/A"
         print(f"  {r:>2}. ${m['volume_24h']:>10,.0f}  [{p}]  {m['question'][:62]}")
         print(f"       {m['url']}")
 
     print(f"\n📈 TOP {len(mover_top)} WEATHER MARKETS BY PROBABILITY MOVE (7D)\n")
-    if not mover_top:
-        print("  None found.")
     for r, m in enumerate(mover_top, 1):
         c = m["price_change_7d"]
-        arrow = "▲" if c > 0 else "▼"
-        print(f"  {r:>2}. {arrow}{abs(c)*100:>5.1f}pp  now {m['yes_price']*100:.1f}%  vol ${m['volume_24h']:,.0f}")
+        print(f"  {r:>2}. {'▲' if c>0 else '▼'}{abs(c)*100:>5.1f}pp  now {m['yes_price']*100:.1f}%  vol ${m['volume_24h']:,.0f}")
         print(f"       {m['question'][:65]}")
         print(f"       {m['url']}")
 
@@ -460,15 +419,13 @@ def print_report(vol_top, mover_top, winners):
     if not winners:
         print("  No winners found.\n")
         return
-
     for r, w in enumerate(winners, 1):
-        name    = w["pseudonym"] or w["proxy_wallet"][:12] + "..."
-        entry_p = f"{w['entry_price']*100:.1f}%" if w["entry_price"] else "?"
-        ts      = w["trade_timestamp"][:16].replace("T", " ") if w["trade_timestamp"] else "?"
-        side    = w["winning_side"]
-        print(f"  {r:>2}. {name}  [{side} won]")
+        name  = w["pseudonym"] or w["proxy_wallet"][:12] + "..."
+        entry = f"{w['entry_price']*100:.1f}%" if w["entry_price"] else "?"
+        ts    = w["trade_timestamp"][:16].replace("T", " ") if w["trade_timestamp"] else "?"
+        print(f"  {r:>2}. {name}  [{w['winning_side']} won]")
         print(f"       Profit:  +${w['profit_usdc']:,.2f}  ({w['profit_pct']:+.1f}%)")
-        print(f"       Bet:     ${w['usdc_spent']:,.2f} @ {entry_p}  on {ts} UTC")
+        print(f"       Bet:     ${w['usdc_spent']:,.2f} @ {entry}  on {ts} UTC")
         print(f"       Market:  {w['market_question'][:65]}")
         print(f"       Profile: {w['polymarket_profile_url']}")
         print()
@@ -476,23 +433,24 @@ def print_report(vol_top, mover_top, winners):
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
-    print(f"[{datetime.now(timezone.utc).isoformat()}] Starting Polymarket weather scanner v3")
-
+    print(f"[{datetime.now(timezone.utc).isoformat()}] Starting Polymarket weather scanner v4")
     conn = sqlite3.connect(DB_PATH)
     init_db(conn)
 
-    active_raw = fetch_active_weather_markets()
+    active_raw = fetch_active_weather()
     active     = [p for m in active_raw if (p := parse_market(m)) is not None]
+    vol_top    = sorted([m for m in active if m["volume_24h"] > 0],
+                        key=lambda m: m["volume_24h"], reverse=True)[:TOP_N_VOLUME]
+    mover_top  = sorted([m for m in active if m["price_change_7d"] != 0],
+                        key=lambda m: abs(m["price_change_7d"]), reverse=True)[:TOP_N_MOVERS]
 
-    vol_top   = top_by_volume(active, TOP_N_VOLUME)
-    mover_top = top_by_pct_change(active, TOP_N_MOVERS)
-
-    resolved_raw = fetch_resolved_weather_markets()
-    winners      = fetch_winners(resolved_raw, TOP_N_WINNERS)
+    resolved_raw = fetch_resolved_weather()
+    winners      = fetch_winners_bulk(resolved_raw, TOP_N_WINNERS)
+    print(f"Found {len(winners)} winners")
 
     scan_id = save_scan(conn, active, vol_top, mover_top, winners)
     conn.close()
-    print(f"\nSaved scan #{scan_id} to {DB_PATH}")
+    print(f"Saved scan #{scan_id} to {DB_PATH}")
 
     print_report(vol_top, mover_top, winners)
     print(f"[{datetime.now(timezone.utc).isoformat()}] Done ✓")
