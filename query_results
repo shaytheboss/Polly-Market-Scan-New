@@ -1,0 +1,158 @@
+"""
+Query helper — run locally to inspect the database.
+
+Usage:
+  python query_results.py                      # latest scan, all sections
+  python query_results.py --winners            # only winners
+  python query_results.py --date 2026-04-15
+  python query_results.py --history 7          # summary of last 7 scans
+  python query_results.py --trader 0xABC...    # all wins for a specific wallet
+"""
+
+import sqlite3
+import sys
+import argparse
+
+DB_PATH = "polymarket.db"
+
+def latest_scan(conn):
+    return conn.execute(
+        "SELECT id, scan_date, scanned_at, markets_total FROM daily_scans ORDER BY id DESC LIMIT 1"
+    ).fetchone()
+
+def show_volume(conn, scan_id):
+    rows = conn.execute("""
+        SELECT rank, volume_24h, yes_price, question, url
+        FROM top_volume_markets WHERE scan_id=? ORDER BY rank
+    """, (scan_id,)).fetchall()
+    print(f"\n🏆 TOP {len(rows)} BY 24H VOLUME\n")
+    for rank, vol, price, question, url in rows:
+        p = f"{price*100:.1f}%" if price else "N/A"
+        print(f"  {rank:>2}. ${vol:>12,.0f}  [{p}]  {question[:60]}")
+        print(f"       {url}")
+
+def show_movers(conn, scan_id):
+    rows = conn.execute("""
+        SELECT rank, price_change_7d, yes_price_now, volume_24h, question, url
+        FROM top_mover_markets WHERE scan_id=? ORDER BY rank
+    """, (scan_id,)).fetchall()
+    print(f"\n📈 TOP {len(rows)} BY PROBABILITY MOVE (7D)\n")
+    for rank, chg, now, vol, question, url in rows:
+        arrow = "▲" if chg > 0 else "▼"
+        print(f"  {rank:>2}. {arrow}{abs(chg)*100:>5.1f}pp  now {now*100:.1f}%  vol ${vol:,.0f}")
+        print(f"       {question[:65]}")
+        print(f"       {url}")
+
+def show_winners(conn, scan_id):
+    rows = conn.execute("""
+        SELECT rank, pseudonym, proxy_wallet, profit_usdc, profit_pct,
+               usdc_spent, entry_price, trade_timestamp,
+               market_question, market_url, polymarket_profile_url
+        FROM winners WHERE scan_id=? ORDER BY rank
+    """, (scan_id,)).fetchall()
+
+    print(f"\n🎯 TOP {len(rows)} WINNING TRADERS\n")
+    if not rows:
+        print("  No winners found for this scan period.")
+        return
+
+    for (rank, pseudonym, wallet, profit, pct, spent,
+         entry_p, ts, question, murl, profile_url) in rows:
+        name    = pseudonym or wallet[:12] + "..."
+        entry_s = f"{entry_p*100:.1f}%" if entry_p else "?"
+        ts_s    = (ts[:16].replace("T", " ") + " UTC") if ts else "?"
+        print(f"  {rank:>2}. {name}")
+        print(f"       Profit:  +${profit:,.2f}  ({pct:+.1f}%)")
+        print(f"       Bet:     ${spent:,.2f} @ {entry_s}  placed {ts_s}")
+        print(f"       Market:  {question[:65]}")
+        print(f"       Market:  {murl}")
+        print(f"       Profile: {profile_url}")
+        print()
+
+def show_trader(conn, wallet):
+    rows = conn.execute("""
+        SELECT w.trade_timestamp, w.entry_price, w.usdc_spent,
+               w.profit_usdc, w.profit_pct, w.market_question,
+               w.market_url, d.scan_date
+        FROM winners w
+        JOIN daily_scans d ON d.id = w.scan_id
+        WHERE LOWER(w.proxy_wallet) = LOWER(?)
+        ORDER BY w.trade_timestamp DESC
+    """, (wallet,)).fetchall()
+
+    if not rows:
+        print(f"No wins found for wallet {wallet}")
+        return
+
+    print(f"\nAll wins for {wallet}:\n")
+    for ts, entry_p, spent, profit, pct, question, murl, scan_date in rows:
+        entry_s = f"{entry_p*100:.1f}%" if entry_p else "?"
+        ts_s    = (ts[:16].replace("T", " ") + " UTC") if ts else "?"
+        print(f"  [{scan_date}] +${profit:,.2f} ({pct:+.1f}%)")
+        print(f"  Bet ${spent:,.2f} @ {entry_s} on {ts_s}")
+        print(f"  {question[:65]}")
+        print(f"  {murl}\n")
+
+def show_history(conn, n):
+    rows = conn.execute(
+        "SELECT id, scan_date, markets_total FROM daily_scans ORDER BY id DESC LIMIT ?", (n,)
+    ).fetchall()
+    print(f"\nLast {n} scans:\n")
+    for scan_id, scan_date, total in rows:
+        winner_count = conn.execute(
+            "SELECT COUNT(*) FROM winners WHERE scan_id=?", (scan_id,)
+        ).fetchone()[0]
+        top_winner = conn.execute(
+            "SELECT pseudonym, profit_usdc FROM winners WHERE scan_id=? ORDER BY rank LIMIT 1",
+            (scan_id,)
+        ).fetchone()
+        tw = f"Top winner: {top_winner[0] or '?'} +${top_winner[1]:,.0f}" if top_winner else "No winners"
+        print(f"  {scan_date}  #{scan_id}  {total} markets  {winner_count} winners  {tw}")
+    print()
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--date",    help="Show scan for date YYYY-MM-DD")
+    parser.add_argument("--history", type=int, default=0)
+    parser.add_argument("--winners", action="store_true", help="Show only winners section")
+    parser.add_argument("--trader",  help="Wallet address to look up")
+    args = parser.parse_args()
+
+    conn = sqlite3.connect(DB_PATH)
+
+    if args.history:
+        show_history(conn, args.history)
+        return
+
+    if args.trader:
+        show_trader(conn, args.trader)
+        return
+
+    if args.date:
+        row = conn.execute(
+            "SELECT id, scan_date, scanned_at, markets_total FROM daily_scans WHERE scan_date=? ORDER BY id DESC LIMIT 1",
+            (args.date,)
+        ).fetchone()
+        if not row:
+            print(f"No scan for {args.date}")
+            sys.exit(1)
+    else:
+        row = latest_scan(conn)
+        if not row:
+            print("No scans in database yet.")
+            sys.exit(0)
+
+    scan_id, scan_date, scanned_at, total = row
+    print(f"\nScan #{scan_id} | {scan_date} | {scanned_at} | {total} markets")
+
+    if args.winners:
+        show_winners(conn, scan_id)
+    else:
+        show_volume(conn, scan_id)
+        show_movers(conn, scan_id)
+        show_winners(conn, scan_id)
+
+    conn.close()
+
+if __name__ == "__main__":
+    main()
