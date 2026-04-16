@@ -1,0 +1,2 @@
+No winner data found for the last 30 days.
+Run polymarket_scanner.py first to populate the database.
