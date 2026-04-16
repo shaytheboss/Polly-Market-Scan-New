@@ -1,19 +1,18 @@
-name: Polymarket Daily Scanner
+name: Polymarket Daily Scan + Insights
 
 on:
   schedule:
-    # Every day at 00:05 UTC (after midnight rollover)
     - cron: "5 0 * * *"
-  workflow_dispatch:  # Allow manual runs from GitHub UI
+  workflow_dispatch:
 
 jobs:
-  scan:
+  scan-and-insights:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # needed to push the DB back to the repo
+      contents: write
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -24,13 +23,32 @@ jobs:
       - name: Run scanner
         env:
           DB_PATH: polymarket.db
-          TOP_N: "20"
+          TOP_N_VOLUME: "50"
+          TOP_N_MOVERS: "50"
+          TOP_N_WINNERS: "100"
+          MIN_TRADE_USDC: "5"
+          MIN_PROFIT_USDC: "2"
+          RESOLVED_LOOKBACK_DAYS: "3"
         run: python polymarket_scanner.py
 
-      - name: Commit and push DB
+      - name: Run insights
+        run: |
+          python insights.py --days 30 --top 30 > insights_30d.txt
+          python insights.py --days 7  --top 20 > insights_7d.txt
+
+      - name: Upload insights as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: insights-${{ github.run_id }}
+          path: |
+            insights_30d.txt
+            insights_7d.txt
+          retention-days: 30
+
+      - name: Commit everything
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add polymarket.db
-          git diff --cached --quiet || git commit -m "chore: daily Polymarket scan $(date -u +%Y-%m-%d)"
+          git add polymarket.db insights_30d.txt insights_7d.txt
+          git diff --cached --quiet || git commit -m "scan: $(date -u +%Y-%m-%d)"
           git push
