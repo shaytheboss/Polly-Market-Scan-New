@@ -276,9 +276,9 @@ def fetch_winners(resolved_markets: list[dict], top_n: int) -> list[dict]:
             wallet = t.get("proxyWallet") or ""
             if not wallet:
                 continue
-            usdc  = float(t.get("usdcSize") or 0)
             size  = float(t.get("size") or 0)
             price = float(t.get("price") or 0)
+            usdc  = float(t.get("usdcSize") or 0) or round(size * price, 4)
             ts    = int(t.get("timestamp") or 0)
             if usdc < MIN_TRADE_USDC:
                 continue
