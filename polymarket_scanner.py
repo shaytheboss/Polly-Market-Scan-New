@@ -1,8 +1,8 @@
 """
 Polymarket Weather Scanner
 ==========================
-Scans only weather and temperature markets.
-Finds top volume, top movers, and winning traders in this niche.
+Strict filter: only markets about temperature/weather forecasts.
+Fast execution: skips small markets before hitting the trades API.
 """
 
 import sqlite3
@@ -25,40 +25,54 @@ TOP_N_VOLUME           = int(os.getenv("TOP_N_VOLUME", "50"))
 TOP_N_MOVERS           = int(os.getenv("TOP_N_MOVERS", "50"))
 TOP_N_WINNERS          = int(os.getenv("TOP_N_WINNERS", "50"))
 MIN_TRADE_USDC         = float(os.getenv("MIN_TRADE_USDC", "10"))
+MIN_MARKET_VOLUME      = float(os.getenv("MIN_MARKET_VOLUME", "100"))  # skip tiny markets when fetching trades
 RESOLVED_LOOKBACK_DAYS = int(os.getenv("RESOLVED_LOOKBACK_DAYS", "3"))
 
-# Keywords that identify weather/temperature markets
-WEATHER_KEYWORDS = [
-    "temperature", "celsius", "fahrenheit", "degrees",
-    "weather", "rainfall", "precipitation", "rain",
-    "snow", "snowfall", "blizzard",
-    "hurricane", "typhoon", "cyclone", "tropical storm",
-    "heat wave", "heatwave", "cold snap",
-    "frost", "freeze", "frozen",
-    "drought", "flood", "flooding",
-    "wind", "windspeed", "tornado",
+# ─── Strict weather filter ────────────────────────────────────────────────────
+# ALL of these must match in the QUESTION TEXT ONLY (not description)
+# We require at least one "temperature signal" + optionally a unit
+
+TEMP_SIGNALS = [
+    "temperature", "highest temperature", "lowest temperature",
+    "high temp", "low temp",
+    "°c", "°f", "celsius", "fahrenheit",
+    "heat wave", "heatwave",
     "hottest", "coldest", "warmest",
-    "high temp", "low temp", "record high", "record low",
-    "above average", "below average",
-    # common city/region + temp combos
-    "°c", "°f",
+    "record high", "record low",
+    "above average temp", "below average temp",
+    "rainfall", "precipitation",
+    "snowfall", "snow accumulation",
+    "hurricane season", "tropical storm",
 ]
 
-# Keywords that should EXCLUDE a market even if it matched above
-# (e.g. "cold war" is not a weather market)
-EXCLUDE_KEYWORDS = [
-    "cold war", "cold case", "cold open",
-    "wind down", "wind up",
-    "flood of", "flooded with",
-    "hot take", "hot mic",
-    "frozen conflict", "freeze on",
+# If ANY of these appear in the question → not a weather market
+FALSE_POSITIVE_PHRASES = [
+    # sports teams / tournaments
+    "hurricanes vs", "vs hurricanes", "miami heat", "heat vs", "vs heat",
+    "thunder vs", "vs thunder", "blazers", "rockets vs",
+    # esports
+    "rainbow six", "r6", "counter-strike", "csgo", "valorant",
+    # cricket / IPL / PSL
+    "ipl", "premier league", "super kings", "zalmi", "gladiators",
+    # generic sports
+    "o/u", "spread:", "handicap", "moneyline", "over/under",
+    "game 1", "game 2", "game 3", "bo3", "bo5",
+    # military / geopolitics
+    "iran", "military", "strike", "ceasefire", "gulf state",
+    # misc
+    "cold war", "flood of votes", "hot mic", "wind down",
+    "valve remove", "map pool",
 ]
 
-def is_weather_market(question: str, description: str = "") -> bool:
-    text = (question + " " + description).lower()
-    if any(ex in text for ex in EXCLUDE_KEYWORDS):
+def is_weather_market(question: str) -> bool:
+    q = question.lower()
+    # Must match at least one temperature signal
+    if not any(sig in q for sig in TEMP_SIGNALS):
         return False
-    return any(kw in text for kw in WEATHER_KEYWORDS)
+    # Must NOT match any false positive
+    if any(fp in q for fp in FALSE_POSITIVE_PHRASES):
+        return False
+    return True
 
 # ─── Database ─────────────────────────────────────────────────────────────────
 
@@ -121,10 +135,10 @@ def init_db(conn: sqlite3.Connection):
             polymarket_profile_url TEXT
         );
 
-        CREATE INDEX IF NOT EXISTS idx_scan_date    ON daily_scans(scan_date);
-        CREATE INDEX IF NOT EXISTS idx_vol_scan     ON top_volume_markets(scan_id);
-        CREATE INDEX IF NOT EXISTS idx_mover_scan   ON top_mover_markets(scan_id);
-        CREATE INDEX IF NOT EXISTS idx_winner_scan  ON winners(scan_id);
+        CREATE INDEX IF NOT EXISTS idx_scan_date   ON daily_scans(scan_date);
+        CREATE INDEX IF NOT EXISTS idx_vol_scan    ON top_volume_markets(scan_id);
+        CREATE INDEX IF NOT EXISTS idx_mover_scan  ON top_mover_markets(scan_id);
+        CREATE INDEX IF NOT EXISTS idx_winner_scan ON winners(scan_id);
     """)
     conn.commit()
 
@@ -133,7 +147,7 @@ def init_db(conn: sqlite3.Connection):
 def fetch_json(url: str, timeout: int = 30, retries: int = 3) -> list | dict:
     for attempt in range(retries):
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "polymarket-weather-scanner/1.0"})
+            req = urllib.request.Request(url, headers={"User-Agent": "polymarket-weather/2.0"})
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 return json.loads(resp.read().decode())
         except urllib.error.HTTPError as e:
@@ -176,31 +190,26 @@ def fetch_paginated(base_url: str, limit: int = 100, max_pages: int = 999) -> li
             break
     return results
 
-# ─── Market fetching & filtering ──────────────────────────────────────────────
+# ─── Market fetching ──────────────────────────────────────────────────────────
 
-def fetch_and_filter_active() -> list[dict]:
-    print("Fetching all active markets...")
+def fetch_active_weather_markets() -> list[dict]:
+    print("Fetching active markets...")
     raw = fetch_paginated(f"{GAMMA_API}/markets?active=true&closed=false")
-    print(f"  Total active: {len(raw)}")
-    filtered = [m for m in raw if is_weather_market(
-        m.get("question") or "",
-        m.get("description") or ""
-    )]
-    print(f"  Weather markets: {len(filtered)}")
+    filtered = [m for m in raw if is_weather_market(m.get("question") or "")]
+    print(f"  Total: {len(raw)} → weather only: {len(filtered)}")
     return filtered
 
-def fetch_and_filter_resolved() -> list[dict]:
+def fetch_resolved_weather_markets() -> list[dict]:
     since = (datetime.now(timezone.utc) - timedelta(days=RESOLVED_LOOKBACK_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    print(f"Fetching markets resolved since {since}...")
+    print(f"Fetching closed markets since {since}...")
     raw = fetch_paginated(
         f"{GAMMA_API}/markets?closed=true&after={since}&order=updatedAt&ascending=false"
     )
     filtered = [
         m for m in raw
-        if is_weather_market(m.get("question") or "", m.get("description") or "")
-        and _resolved_yes(m)
+        if is_weather_market(m.get("question") or "") and _resolved_yes(m)
     ]
-    print(f"  Total closed: {len(raw)} → weather+resolved YES: {len(filtered)}")
+    print(f"  Total closed: {len(raw)} → weather+YES: {len(filtered)}")
     return filtered
 
 def _resolved_yes(m: dict) -> bool:
@@ -238,11 +247,10 @@ def parse_market(m: dict) -> Optional[dict]:
         if yes_price is None:
             yes_price = float(m.get("lastTradePrice") or 0)
 
-        slug         = m.get("slug") or ""
-        condition_id = m.get("conditionId") or ""
+        slug = m.get("slug") or ""
         return {
             "market_id":       str(m.get("id") or ""),
-            "condition_id":    condition_id,
+            "condition_id":    m.get("conditionId") or "",
             "question":        m.get("question") or "",
             "slug":            slug,
             "volume_24h":      vol_24h,
@@ -269,11 +277,17 @@ def top_by_pct_change(markets, n):
 # ─── Winners ──────────────────────────────────────────────────────────────────
 
 def fetch_winners(resolved_markets: list[dict], top_n: int) -> list[dict]:
-    all_winners = []
-    print(f"\nFetching winning trades for {len(resolved_markets)} resolved weather markets...")
+    # Skip markets with negligible volume — no interesting traders there
+    candidates = [
+        m for m in resolved_markets
+        if float(m.get("volume") or 0) >= MIN_MARKET_VOLUME
+    ]
+    skipped = len(resolved_markets) - len(candidates)
+    print(f"\nFetching winners: {len(candidates)} markets (skipped {skipped} with volume < ${MIN_MARKET_VOLUME:,.0f})")
 
-    for i, m in enumerate(resolved_markets):
-        condition_id = m.get("conditionId") or m.get("condition_id") or ""
+    all_winners = []
+    for i, m in enumerate(candidates):
+        condition_id = m.get("conditionId") or ""
         question     = m.get("question") or ""
         slug         = m.get("slug") or ""
         market_url   = f"https://polymarket.com/event/{slug}" if slug else ""
@@ -281,14 +295,14 @@ def fetch_winners(resolved_markets: list[dict], top_n: int) -> list[dict]:
         if not condition_id:
             continue
 
-        print(f"  [{i+1}/{len(resolved_markets)}] {question[:60]}...")
+        print(f"  [{i+1}/{len(candidates)}] {question[:65]}...")
 
         trades = fetch_paginated(
             f"{DATA_API}/trades?conditionId={condition_id}&side=BUY&outcomeIndex=0",
-            limit=500, max_pages=5
+            limit=500, max_pages=3
         )
         if not trades:
-            time.sleep(0.2)
+            time.sleep(0.1)
             continue
 
         wallet_data: dict[str, dict] = {}
@@ -313,10 +327,8 @@ def fetch_winners(resolved_markets: list[dict], top_n: int) -> list[dict]:
                     "earliest_ts":    ts,
                     "earliest_price": price,
                 }
-
             wallet_data[wallet]["usdc_spent"]    += usdc
             wallet_data[wallet]["tokens_bought"] += size
-
             if ts and ts < wallet_data[wallet]["earliest_ts"]:
                 wallet_data[wallet]["earliest_ts"]    = ts
                 wallet_data[wallet]["earliest_price"] = price
@@ -325,10 +337,9 @@ def fetch_winners(resolved_markets: list[dict], top_n: int) -> list[dict]:
             if d["usdc_spent"] <= 0:
                 continue
             profit_usdc = d["tokens_bought"] - d["usdc_spent"]
-            profit_pct  = (profit_usdc / d["usdc_spent"]) * 100
             if profit_usdc <= 0:
                 continue
-
+            profit_pct = (profit_usdc / d["usdc_spent"]) * 100
             ts_iso = ""
             if d["earliest_ts"]:
                 try:
@@ -337,34 +348,34 @@ def fetch_winners(resolved_markets: list[dict], top_n: int) -> list[dict]:
                     pass
 
             all_winners.append({
-                "proxy_wallet":            wallet,
-                "pseudonym":               d["pseudonym"],
-                "market_question":         question,
-                "condition_id":            condition_id,
-                "market_slug":             slug,
-                "market_url":              market_url,
-                "trade_timestamp":         ts_iso,
-                "entry_price":             d["earliest_price"],
-                "usdc_spent":              round(d["usdc_spent"], 2),
-                "tokens_bought":           round(d["tokens_bought"], 4),
-                "profit_usdc":             round(profit_usdc, 2),
-                "profit_pct":              round(profit_pct, 2),
-                "polymarket_profile_url":  f"https://polymarket.com/profile/{wallet}",
+                "proxy_wallet":           wallet,
+                "pseudonym":              d["pseudonym"],
+                "market_question":        question,
+                "condition_id":           condition_id,
+                "market_slug":            slug,
+                "market_url":             market_url,
+                "trade_timestamp":        ts_iso,
+                "entry_price":            d["earliest_price"],
+                "usdc_spent":             round(d["usdc_spent"], 2),
+                "tokens_bought":          round(d["tokens_bought"], 4),
+                "profit_usdc":            round(profit_usdc, 2),
+                "profit_pct":             round(profit_pct, 2),
+                "polymarket_profile_url": f"https://polymarket.com/profile/{wallet}",
             })
 
-        time.sleep(0.3)
+        time.sleep(0.1)  # reduced from 0.3
 
     all_winners.sort(key=lambda w: w["profit_usdc"], reverse=True)
     return all_winners[:top_n]
 
 # ─── DB writes ────────────────────────────────────────────────────────────────
 
-def save_scan(conn, all_markets, vol_top, mover_top, winners):
+def save_scan(conn, active, vol_top, mover_top, winners):
     now = datetime.now(timezone.utc)
     cur = conn.cursor()
     cur.execute(
         "INSERT INTO daily_scans (scan_date, scanned_at, markets_total, weather_total) VALUES (?,?,?,?)",
-        (now.strftime("%Y-%m-%d"), now.isoformat(), len(all_markets), len(all_markets))
+        (now.strftime("%Y-%m-%d"), now.isoformat(), len(active), len(active))
     )
     scan_id = cur.lastrowid
 
@@ -410,14 +421,13 @@ def save_scan(conn, all_markets, vol_top, mover_top, winners):
 # ─── Report ───────────────────────────────────────────────────────────────────
 
 def print_report(vol_top, mover_top, winners):
-    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     print("\n" + "="*72)
-    print(f"  POLYMARKET WEATHER SCAN — {now_str}")
+    print(f"  POLYMARKET WEATHER SCAN — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
     print("="*72)
 
     print(f"\n🌡️  TOP {len(vol_top)} WEATHER MARKETS BY 24H VOLUME\n")
     if not vol_top:
-        print("  No weather markets with volume found.")
+        print("  None found.")
     for r, m in enumerate(vol_top, 1):
         p = f"{m['yes_price']*100:.1f}%" if m["yes_price"] else "N/A"
         print(f"  {r:>2}. ${m['volume_24h']:>10,.0f}  [{p}]  {m['question'][:62]}")
@@ -425,29 +435,25 @@ def print_report(vol_top, mover_top, winners):
 
     print(f"\n📈 TOP {len(mover_top)} WEATHER MARKETS BY PROBABILITY MOVE (7D)\n")
     if not mover_top:
-        print("  No movers found.")
+        print("  None found.")
     for r, m in enumerate(mover_top, 1):
         c = m["price_change_7d"]
         arrow = "▲" if c > 0 else "▼"
-        print(
-            f"  {r:>2}. {arrow}{abs(c)*100:>5.1f}pp  "
-            f"now {m['yes_price']*100:.1f}%  "
-            f"vol ${m['volume_24h']:,.0f}  "
-            f"{m['question'][:50]}"
-        )
+        print(f"  {r:>2}. {arrow}{abs(c)*100:>5.1f}pp  now {m['yes_price']*100:.1f}%  vol ${m['volume_24h']:,.0f}")
+        print(f"       {m['question'][:65]}")
         print(f"       {m['url']}")
 
-    print(f"\n🎯 TOP {len(winners)} WINNING TRADERS (weather markets, last {RESOLVED_LOOKBACK_DAYS}d)\n")
+    print(f"\n🎯 TOP {len(winners)} WINNING TRADERS (last {RESOLVED_LOOKBACK_DAYS}d)\n")
     if not winners:
-        print("  No winners found for this period.\n")
+        print("  No winners found.\n")
         return
     for r, w in enumerate(winners, 1):
-        name    = w["pseudonym"] or w["proxy_wallet"][:10] + "..."
+        name    = w["pseudonym"] or w["proxy_wallet"][:12] + "..."
         entry_p = f"{w['entry_price']*100:.1f}%" if w["entry_price"] else "?"
         ts      = w["trade_timestamp"][:16].replace("T", " ") if w["trade_timestamp"] else "?"
         print(f"  {r:>2}. {name}")
         print(f"       Profit:  +${w['profit_usdc']:,.2f}  ({w['profit_pct']:+.1f}%)")
-        print(f"       Bet:     ${w['usdc_spent']:,.2f} @ {entry_p}  placed {ts} UTC")
+        print(f"       Bet:     ${w['usdc_spent']:,.2f} @ {entry_p}  on {ts} UTC")
         print(f"       Market:  {w['market_question'][:65]}")
         print(f"       Profile: {w['polymarket_profile_url']}")
         print()
@@ -460,15 +466,13 @@ def main():
     conn = sqlite3.connect(DB_PATH)
     init_db(conn)
 
-    # Active weather markets
-    active_raw    = fetch_and_filter_active()
-    active        = [p for m in active_raw if (p := parse_market(m)) is not None]
+    active_raw = fetch_active_weather_markets()
+    active     = [p for m in active_raw if (p := parse_market(m)) is not None]
 
     vol_top   = top_by_volume(active, TOP_N_VOLUME)
     mover_top = top_by_pct_change(active, TOP_N_MOVERS)
 
-    # Resolved weather markets → winners
-    resolved_raw = fetch_and_filter_resolved()
+    resolved_raw = fetch_resolved_weather_markets()
     winners      = fetch_winners(resolved_raw, TOP_N_WINNERS)
 
     scan_id = save_scan(conn, active, vol_top, mover_top, winners)
