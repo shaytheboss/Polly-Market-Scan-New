@@ -1,84 +1,84 @@
 
-Loaded 600 winning trades across the last 7 days
-Found 109 unique winning traders
+Loaded 700 winning trades across the last 7 days
+Found 116 unique winning traders
 
 
 🏆 MOST CONSISTENT WINNERS (last 7 days)
 
   #   Name                    Wins    Total $     ROI  Profile
   ----------------------------------------------------------------------
-  1   Lumbering-Material        27 $66,193.43 2216.7%  https://polymarket.com/profile/0x1c0f3e4c90a48e4dd93d0abcdf719a5a5f1599d0
-  2   Wary-Tragedy              21 $145,568.88   43.0%  https://polymarket.com/profile/0xc4c3c42ba5460c8d1309aed95e703f0420db2e3f
-  3   Charming-Metabolite       17 $291,446.29 4385.7%  https://polymarket.com/profile/0x880d2b8f3df6881150d1ef1a1f2ac0767e39adb6
-  4   Uncomfortable-Smith       15 $244,795.44 18894.2%  https://polymarket.com/profile/0x4d3e14cdd0aa30e3cf20e1e57d49263c69d12e20
-  5   0x510881deb8...           12 $90,561.18 99891.0%  https://polymarket.com/profile/0x510881deb8cf9da419ca9f74dd8d066e702d83b4
-  6   Canine-Anything           12 $28,881.03 10500.7%  https://polymarket.com/profile/0x8bad0e57ff8b8ec449f3611e2735e9ab860cb337
-  7   Swift-Surface             12 $202,490.88 4282.8%  https://polymarket.com/profile/0x21b864b4a635136409bc4f499d470bb912fab2f1
-  8   Hateful-Safety            11 $49,333.95 14506.6%  https://polymarket.com/profile/0x1ad6c4a3369ab671c40f4637d29d49446a6f669e
-  9   0x09b051b47d...           10 $542,279.94 99904.2%  https://polymarket.com/profile/0x09b051b47d75c125ca025bef34293645be41fb66
-  10  Unhealthy-Bog              9 $45,531.15 10763.1%  https://polymarket.com/profile/0xcbbc5e035504421b084ad9248b660f6e9618b5d0
-  11  Incredible-Receptor        9 $43,416.99 10736.9%  https://polymarket.com/profile/0x686880eea810fa9141be46a1acec9eee41755198
-  12  Torn-Gap                   8 $283,278.98 10897.0%  https://polymarket.com/profile/0x3b5ed55a6c006fe8c4bd6a9e97fbc1b342384033
-  13  Discrete-Senate            7 $100,137.87 85778.5%  https://polymarket.com/profile/0x713b141cd18376bd78c77e12305d45a0001dc916
-  14  Upbeat-Fee                 6 $164,308.44 99907.8%  https://polymarket.com/profile/0xf1faf3f6ad1e0264d6cbecc1a416e7c536be047d
-  15  Limping-Shape              6 $113,892.00 99905.3%  https://polymarket.com/profile/0x81035115a389a085e36255e5cb9b9ab8ee3723a1
-  16  0x113b44e9eb...            6 $1,310,178.78 99900.8%  https://polymarket.com/profile/0x113b44e9eb584b34fd5e3dc61bf5b765ccba3048
-  17  Diligent-Paradise          6 $1,615,899.60 99898.6%  https://polymarket.com/profile/0x56546735d4e9a0039b0cc15f1b5061fd1a33068a
-  18  Focused-Marshmallow        6 $148,765.56 72497.8%  https://polymarket.com/profile/0xed3c91115e83eaad1132dcb6edaa185f21ae017b
-  19  Corny-Heating              6 $28,446.00 49905.3%  https://polymarket.com/profile/0x94c81ef08355518456bf8e5cda2f15b3c0af0231
-  20  Majestic-Shorts            6 $86,475.84 49905.3%  https://polymarket.com/profile/0x690b047e69f139d3acd9a985ab582df1f1cc9145
+  1   Lumbering-Material        33 $79,273.92 2201.3%  https://polymarket.com/profile/0x1c0f3e4c90a48e4dd93d0abcdf719a5a5f1599d0
+  2   Wary-Tragedy              25 $170,455.13   42.0%  https://polymarket.com/profile/0xc4c3c42ba5460c8d1309aed95e703f0420db2e3f
+  3   Charming-Metabolite       19 $307,595.13 4117.1%  https://polymarket.com/profile/0x880d2b8f3df6881150d1ef1a1f2ac0767e39adb6
+  4   Uncomfortable-Smith       17 $270,085.77 19034.9%  https://polymarket.com/profile/0x4d3e14cdd0aa30e3cf20e1e57d49263c69d12e20
+  5   0x510881deb8...           14 $105,654.71 99891.0%  https://polymarket.com/profile/0x510881deb8cf9da419ca9f74dd8d066e702d83b4
+  6   Canine-Anything           14 $34,276.36 10907.7%  https://polymarket.com/profile/0x8bad0e57ff8b8ec449f3611e2735e9ab860cb337
+  7   Swift-Surface             14 $236,239.36 4282.8%  https://polymarket.com/profile/0x21b864b4a635136409bc4f499d470bb912fab2f1
+  8   Hateful-Safety            13 $58,342.96 14502.0%  https://polymarket.com/profile/0x1ad6c4a3369ab671c40f4637d29d49446a6f669e
+  9   0x09b051b47d...           12 $664,730.65 99903.9%  https://polymarket.com/profile/0x09b051b47d75c125ca025bef34293645be41fb66
+  10  Unhealthy-Bog             11 $57,696.48 11070.8%  https://polymarket.com/profile/0xcbbc5e035504421b084ad9248b660f6e9618b5d0
+  11  Incredible-Receptor       10 $49,855.34 10974.3%  https://polymarket.com/profile/0x686880eea810fa9141be46a1acec9eee41755198
+  12  Discrete-Senate            9 $126,541.80 85115.9%  https://polymarket.com/profile/0x713b141cd18376bd78c77e12305d45a0001dc916
+  13  Torn-Gap                   8 $283,278.98 10897.0%  https://polymarket.com/profile/0x3b5ed55a6c006fe8c4bd6a9e97fbc1b342384033
+  14  Upbeat-Fee                 7 $191,693.18 99907.8%  https://polymarket.com/profile/0xf1faf3f6ad1e0264d6cbecc1a416e7c536be047d
+  15  Limping-Shape              7 $132,874.00 99905.3%  https://polymarket.com/profile/0x81035115a389a085e36255e5cb9b9ab8ee3723a1
+  16  0x113b44e9eb...            7 $1,528,541.91 99900.8%  https://polymarket.com/profile/0x113b44e9eb584b34fd5e3dc61bf5b765ccba3048
+  17  Diligent-Paradise          7 $1,885,216.20 99898.6%  https://polymarket.com/profile/0x56546735d4e9a0039b0cc15f1b5061fd1a33068a
+  18  Focused-Marshmallow        7 $173,559.82 72497.8%  https://polymarket.com/profile/0xed3c91115e83eaad1132dcb6edaa185f21ae017b
+  19  Corny-Heating              7 $33,187.00 49905.3%  https://polymarket.com/profile/0x94c81ef08355518456bf8e5cda2f15b3c0af0231
+  20  Majestic-Shorts            7 $100,888.48 49905.3%  https://polymarket.com/profile/0x690b047e69f139d3acd9a985ab582df1f1cc9145
 
 
 💰 HIGHEST TOTAL PROFIT (last 7 days)
 
   #   Name                      Total $  Wins   Avg/win  Profile
   ----------------------------------------------------------------------
-  1   Diligent-Paradise      $1,615,899.60     6 $269,316.60  https://polymarket.com/profile/0x56546735d4e9a0039b0cc15f1b5061fd1a33068a
-  2   0x113b44e9eb...        $1,310,178.78     6 $218,363.13  https://polymarket.com/profile/0x113b44e9eb584b34fd5e3dc61bf5b765ccba3048
-  3   Limp-Hospice           $944,382.80     4 $236,095.70  https://polymarket.com/profile/0xfd9d411fa27f295d36c5ada080ba1349f716bc2e
-  4   Dapper-Casino          $677,887.77     3 $225,962.59  https://polymarket.com/profile/0xd0cf66ba9c134e01c15a53330a8aebf91277c08c
-  5   0x09b051b47d...        $542,279.94    10 $54,227.99  https://polymarket.com/profile/0x09b051b47d75c125ca025bef34293645be41fb66
-  6   Darling-Imitation      $346,502.04     6 $57,750.34  https://polymarket.com/profile/0xd60c551492ca0b2ee6cbc9aac8e4df4c64b5f46c
-  7   Meek-Overview          $325,103.80     5 $65,020.76  https://polymarket.com/profile/0x9652b81583276f840025c2667ec81c4178591ab4
-  8   Shoddy-Aftershock      $298,558.75     5 $59,711.75  https://polymarket.com/profile/0xb977ffa7f22db6633762e6372661a30bb53fb5e2
-  9   Charming-Metabolite    $291,446.29    17 $17,143.90  https://polymarket.com/profile/0x880d2b8f3df6881150d1ef1a1f2ac0767e39adb6
+  1   Diligent-Paradise      $1,885,216.20     7 $269,316.60  https://polymarket.com/profile/0x56546735d4e9a0039b0cc15f1b5061fd1a33068a
+  2   0x113b44e9eb...        $1,528,541.91     7 $218,363.13  https://polymarket.com/profile/0x113b44e9eb584b34fd5e3dc61bf5b765ccba3048
+  3   Limp-Hospice           $1,180,478.50     5 $236,095.70  https://polymarket.com/profile/0xfd9d411fa27f295d36c5ada080ba1349f716bc2e
+  4   Dapper-Casino          $903,850.36     4 $225,962.59  https://polymarket.com/profile/0xd0cf66ba9c134e01c15a53330a8aebf91277c08c
+  5   0x09b051b47d...        $664,730.65    12 $55,394.22  https://polymarket.com/profile/0x09b051b47d75c125ca025bef34293645be41fb66
+  6   Darling-Imitation      $404,252.38     7 $57,750.34  https://polymarket.com/profile/0xd60c551492ca0b2ee6cbc9aac8e4df4c64b5f46c
+  7   Shoddy-Aftershock      $358,270.50     6 $59,711.75  https://polymarket.com/profile/0xb977ffa7f22db6633762e6372661a30bb53fb5e2
+  8   Meek-Overview          $325,103.80     5 $65,020.76  https://polymarket.com/profile/0x9652b81583276f840025c2667ec81c4178591ab4
+  9   Charming-Metabolite    $307,595.13    19 $16,189.22  https://polymarket.com/profile/0x880d2b8f3df6881150d1ef1a1f2ac0767e39adb6
   10  Torn-Gap               $283,278.98     8 $35,409.87  https://polymarket.com/profile/0x3b5ed55a6c006fe8c4bd6a9e97fbc1b342384033
-  11  Phony-Camel            $249,441.64     4 $62,360.41  https://polymarket.com/profile/0xd615e8147bc1d95886fed1d51ddc61e44b82b09b
-  12  Uncomfortable-Smith    $244,795.44    15 $16,319.70  https://polymarket.com/profile/0x4d3e14cdd0aa30e3cf20e1e57d49263c69d12e20
-  13  Useless-Adaptation     $202,789.26     6 $33,798.21  https://polymarket.com/profile/0x3970ce9259501e736a4a1bfcd6e643d68a28f56b
-  14  Swift-Surface          $202,490.88    12 $16,874.24  https://polymarket.com/profile/0x21b864b4a635136409bc4f499d470bb912fab2f1
-  15  Impartial-Pennant      $202,057.83     3 $67,352.61  https://polymarket.com/profile/0xfca3c147d2e7027d351c8c4536e8f01f368593ea
-  16  Upbeat-Fee             $164,308.44     6 $27,384.74  https://polymarket.com/profile/0xf1faf3f6ad1e0264d6cbecc1a416e7c536be047d
-  17  Focused-Marshmallow    $148,765.56     6 $24,794.26  https://polymarket.com/profile/0xed3c91115e83eaad1132dcb6edaa185f21ae017b
-  18  Wary-Tragedy           $145,568.88    21 $6,931.85  https://polymarket.com/profile/0xc4c3c42ba5460c8d1309aed95e703f0420db2e3f
-  19  Torn-Secretary         $136,790.06     2 $68,395.03  https://polymarket.com/profile/0x9065ef8280738e0feb105f54137c7071f07fb9a3
-  20  Ancient-Android        $121,506.66     6 $20,251.11  https://polymarket.com/profile/0xb846800eb25279462d402541f9a29f0712de034d
+  11  Uncomfortable-Smith    $270,085.77    17 $15,887.40  https://polymarket.com/profile/0x4d3e14cdd0aa30e3cf20e1e57d49263c69d12e20
+  12  Phony-Camel            $249,441.64     4 $62,360.41  https://polymarket.com/profile/0xd615e8147bc1d95886fed1d51ddc61e44b82b09b
+  13  Useless-Adaptation     $236,587.47     7 $33,798.21  https://polymarket.com/profile/0x3970ce9259501e736a4a1bfcd6e643d68a28f56b
+  14  Swift-Surface          $236,239.36    14 $16,874.24  https://polymarket.com/profile/0x21b864b4a635136409bc4f499d470bb912fab2f1
+  15  Torn-Secretary         $205,185.09     3 $68,395.03  https://polymarket.com/profile/0x9065ef8280738e0feb105f54137c7071f07fb9a3
+  16  Impartial-Pennant      $202,057.83     3 $67,352.61  https://polymarket.com/profile/0xfca3c147d2e7027d351c8c4536e8f01f368593ea
+  17  Upbeat-Fee             $191,693.18     7 $27,384.74  https://polymarket.com/profile/0xf1faf3f6ad1e0264d6cbecc1a416e7c536be047d
+  18  Focused-Marshmallow    $173,559.82     7 $24,794.26  https://polymarket.com/profile/0xed3c91115e83eaad1132dcb6edaa185f21ae017b
+  19  Wary-Tragedy           $170,455.13    25 $6,818.21  https://polymarket.com/profile/0xc4c3c42ba5460c8d1309aed95e703f0420db2e3f
+  20  Ancient-Android        $141,757.77     7 $20,251.11  https://polymarket.com/profile/0xb846800eb25279462d402541f9a29f0712de034d
 
 
 ⏱️  BEST TIMING — entered earliest (last 7 days, min 2 wins)
 
   #   Name                    Avg entry  Wins    Total $  Profile
   ----------------------------------------------------------------------
-  1   0x113b44e9eb...              0.1%     6 $1,310,178.78  https://polymarket.com/profile/0x113b44e9eb584b34fd5e3dc61bf5b765ccba3048
-  2   Limp-Hospice                 0.1%     4 $944,382.80  https://polymarket.com/profile/0xfd9d411fa27f295d36c5ada080ba1349f716bc2e
+  1   0x113b44e9eb...              0.1%     7 $1,528,541.91  https://polymarket.com/profile/0x113b44e9eb584b34fd5e3dc61bf5b765ccba3048
+  2   Limp-Hospice                 0.1%     5 $1,180,478.50  https://polymarket.com/profile/0xfd9d411fa27f295d36c5ada080ba1349f716bc2e
   3   Hideous-Gherkin              0.1%     5 $33,218.50  https://polymarket.com/profile/0xa754b9f02812185dda469c30acb39f146806d8cf
   4   Gullible-Pray                0.1%     5 $33,218.50  https://polymarket.com/profile/0xdc4546ea635695d8059e78473ff5b464d96a9c6e
   5   Periodic-Footwear            0.1%     5 $68,230.20  https://polymarket.com/profile/0x1b8c538ac940a3f85b4517c82044541858feb2ee
   6   Pitiful-Cottage              0.1%     2 $49,022.16  https://polymarket.com/profile/0x4c82215bd4245a213a34b1cfd0be45ff750e8047
-  7   Corny-Heating                0.2%     6 $28,446.00  https://polymarket.com/profile/0x94c81ef08355518456bf8e5cda2f15b3c0af0231
-  8   Majestic-Shorts              0.2%     6 $86,475.84  https://polymarket.com/profile/0x690b047e69f139d3acd9a985ab582df1f1cc9145
-  9   Darling-Imitation            0.2%     6 $346,502.04  https://polymarket.com/profile/0xd60c551492ca0b2ee6cbc9aac8e4df4c64b5f46c
-  10  Monstrous-Dew                0.2%     2 $16,180.22  https://polymarket.com/profile/0x5b6331e7ff0831a3fe2ed12004747db1a9c911a4
-  11  Idealistic-Script            0.3%     3 $31,280.64  https://polymarket.com/profile/0xe35a82f77251f7d757a738fcc598553b258682f4
-  12  Exhausted-Meme               0.3%     5 $48,844.40  https://polymarket.com/profile/0x1adeda0f5e44dd8cc205f66e316354e26fc4c142
-  13  Torn-Secretary               0.3%     2 $136,790.06  https://polymarket.com/profile/0x9065ef8280738e0feb105f54137c7071f07fb9a3
-  14  Trivial-Sow                  0.4%     5 $ 7,573.90  https://polymarket.com/profile/0x46f2902a336ad6c50c445298cace811e339c33e5
-  15  Overdue-Dagger               0.4%     3 $ 3,735.75  https://polymarket.com/profile/0x585aeb19eb461a8409eca82ac24541cd3eee26ec
-  16  Ironclad-Herbs               0.4%     6 $26,769.66  https://polymarket.com/profile/0x6c2be10fb07747a3c751c77774938a15fbcf36f4
-  17  Impure-Treaty                0.5%     6 $24,043.50  https://polymarket.com/profile/0x28d24229dcdc2f9355c90c41c088774c98475621
-  18  Green-Step                   0.5%     4 $35,928.96  https://polymarket.com/profile/0xde4c8a3a8002a25c463d7b7cd6092a102712fa5f
-  19  Unsteady-Metaphor            0.6%     6 $28,972.08  https://polymarket.com/profile/0x7f0f5e5b5d2b0abccf25cc01cd648702690acba6
-  20  Meek-Overview                0.7%     5 $325,103.80  https://polymarket.com/profile/0x9652b81583276f840025c2667ec81c4178591ab4
+  7   Corny-Heating                0.2%     7 $33,187.00  https://polymarket.com/profile/0x94c81ef08355518456bf8e5cda2f15b3c0af0231
+  8   Majestic-Shorts              0.2%     7 $100,888.48  https://polymarket.com/profile/0x690b047e69f139d3acd9a985ab582df1f1cc9145
+  9   Rewarding-Placebo            0.2%     2 $114,327.68  https://polymarket.com/profile/0x2dbe7c1e520386c303ee4da03c89c64388ee6351
+  10  Darling-Imitation            0.2%     7 $404,252.38  https://polymarket.com/profile/0xd60c551492ca0b2ee6cbc9aac8e4df4c64b5f46c
+  11  Monstrous-Dew                0.2%     3 $24,270.33  https://polymarket.com/profile/0x5b6331e7ff0831a3fe2ed12004747db1a9c911a4
+  12  Idealistic-Script            0.3%     4 $41,707.52  https://polymarket.com/profile/0xe35a82f77251f7d757a738fcc598553b258682f4
+  13  Exhausted-Meme               0.3%     6 $58,613.28  https://polymarket.com/profile/0x1adeda0f5e44dd8cc205f66e316354e26fc4c142
+  14  Torn-Secretary               0.3%     3 $205,185.09  https://polymarket.com/profile/0x9065ef8280738e0feb105f54137c7071f07fb9a3
+  15  Trivial-Sow                  0.4%     6 $ 9,088.68  https://polymarket.com/profile/0x46f2902a336ad6c50c445298cace811e339c33e5
+  16  Overdue-Dagger               0.4%     4 $ 4,981.00  https://polymarket.com/profile/0x585aeb19eb461a8409eca82ac24541cd3eee26ec
+  17  Ironclad-Herbs               0.4%     7 $31,231.27  https://polymarket.com/profile/0x6c2be10fb07747a3c751c77774938a15fbcf36f4
+  18  Impure-Treaty                0.5%     7 $28,050.75  https://polymarket.com/profile/0x28d24229dcdc2f9355c90c41c088774c98475621
+  19  Subtle-Leek                  0.5%     2 $ 3,025.86  https://polymarket.com/profile/0xc811b43f3aea039e621e1073dd91a31cbb43a5be
+  20  Green-Step                   0.5%     4 $35,928.96  https://polymarket.com/profile/0xde4c8a3a8002a25c463d7b7cd6092a102712fa5f
 
   Note: lower % = entered when price was cheaper = earlier / better timing
 
